@@ -55,5 +55,24 @@ namespace EFCoreTests
 
             transaction.Commit();
         }
+
+        [Fact]
+        public void Savepoint()
+        {
+            using var context = new TestContext();
+            context.Database.EnsureCreated();
+
+            using var transaction = context.Database.BeginTransaction();
+
+            context.Add(new Employee { Name = "John Doe" });
+            context.SaveChanges();
+
+            transaction.CreateSavepoint("A");
+
+            context.Add(new Employee { Name = "Jane Doe" });
+            context.SaveChanges();
+
+            transaction.Commit();
+        }
     }
 }
