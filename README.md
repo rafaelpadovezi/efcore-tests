@@ -101,7 +101,7 @@ dbug: RelationalEventId.TransactionCommitted[20202] (Microsoft.EntityFrameworkCo
 
 Para a maioria dos casos, o uso do `SaveChanges` é o suficiente para garantir a consistência dos dados. Porém, quando preciso, é possível controlar as transações manualmente.
 
-O teste seguinte utiliza o mesmo exemplo do primeiro. Dessa vez o método `SaveChanges` está sendo executado dentro de uma transaçao iniciada com  método `BeginTransaction`.
+O segundo teste utiliza o mesmo exemplo do primeiro. Dessa vez o método `SaveChanges` está sendo executado dentro de uma transaçao iniciada com  método `BeginTransaction`.
 
 ```csharp
 var employee = new Employee
@@ -125,7 +125,7 @@ context.SaveChanges();
 transaction.Commit();
 ```
 
-As primeiras entradas do log são de abertura de transação. Como o primeiro teste, a transação é iniciada com o nível de isolamento não especificado e criada com o nível [`ReadCommited`](https://docs.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide?view=sql-server-ver15#database-engine-isolation-levels).
+As primeiras entradas do log são de abertura da transação. Como o primeiro teste, a transação é iniciada com o nível de isolamento não especificado e criada com o nível `ReadCommited`.
 
 ```sql
 dbug: RelationalEventId.TransactionStarting[20209] (Microsoft.EntityFrameworkCore.Database.Transaction) 
@@ -133,7 +133,8 @@ dbug: RelationalEventId.TransactionStarting[20209] (Microsoft.EntityFrameworkCor
 dbug: RelationalEventId.TransactionStarted[20200] (Microsoft.EntityFrameworkCore.Database.Transaction) 
       Began transaction with isolation level 'ReadCommitted'.
 ```
-Ao executar o método `SaveChanges`, o EF Core cria um **savepoint** do banco de dados ao invés de abrir uma transação aninhada. Os logs de detecção de alterações nas entidades foram omitidos.
+Ao executar o método `SaveChanges`, o EF Core cria um **savepoint** da transação ao invés de abrir uma transação aninhada. Os logs de detecção de alterações nas entidades foram omitidos.
+
 ```sql
 dbug: CoreEventId.SaveChangesStarting[10004] (Microsoft.EntityFrameworkCore.Update) 
       SaveChanges starting for 'TestContext'.
@@ -166,7 +167,7 @@ dbug: RelationalEventId.CommandExecuting[20100] (Microsoft.EntityFrameworkCore.D
       WHERE @@ROWCOUNT = 1 AND [Id] = scope_identity();
 ```
 
-Por fim, ao executadar o método `transaction.Commit()`, as alterações são confirmadas.
+Por fim, ao executar o método `transaction.Commit()`, as alterações são confirmadas.
 
 ```sql
 dbug: RelationalEventId.TransactionCommitting[20210] (Microsoft.EntityFrameworkCore.Database.Transaction) 
@@ -177,7 +178,7 @@ dbug: RelationalEventId.TransactionCommitted[20202] (Microsoft.EntityFrameworkCo
 
 ## Diferença entre transações aninhadas e savepoints no SQL Server
 
-No SQL Server, o uso de transalçoes aninhadas tem um comportamento que costuma confundir os desenvolvedores. O `ROLLBACK` reverte todas as transações abertas da sessão. Não importa se existam transações aninhadas, o `ROLLBACK` vai desfazer todas as operações realizadas desde o primeiro `BEGIN TRANSACTION`.
+No SQL Server, o uso de trnansações aninhadas tem um comportamento que pode confundir os desenvolvedores. O `ROLLBACK` reverte todas as transações abertas da sessão. Não importa se existam transações aninhadas, o `ROLLBACK` vai desfazer todas as operações realizadas desde o primeiro `BEGIN TRANSACTION`.
 
 Já o `SAVE TRANSACTION` coloca uma tag no ponto desejado da transação de forma a ser possível executar o `ROLLBACK` e reverter as mudanças até esse ponto. É possível criar vários savepoints em uma mesma transação. É importante lembrar que o `SAVE TRANSACTION` não abre uma transação.
 
