@@ -1,14 +1,14 @@
 # Como funciona a transação do SaveChanges no EF Core
 
-O método `SaveChanges` é responsável por salvar todas as alterações no banco de dados quando se está trabalhando com o Entity Framework. Ao executar esse método, por padrão, estamos executando as operações dentro de uma transação. A [documentação](https://docs.microsoft.com/pt-br/ef/core/saving/transactions) diz:
+O método `SaveChanges` é responsável por salvar todas as alterações no banco de dados quando se está trabalhando com o Entity Framework Core. Ao executar esse método, por padrão, estamos executando as operações dentro de uma transação. A [documentação](https://docs.microsoft.com/pt-br/ef/core/saving/transactions) diz:
 
-> Por padrão, se o provedor de banco de dados oferecer suporte a transações, todas as alterações em uma única chamada para SaveChanges serão aplicadas em uma transação. Se qualquer uma das alterações falhar, a transação é revertida e nenhuma das alterações será aplicada ao banco de dados. Isso significa que é garantido que o SaveChanges terá êxito ou sairá do banco de dados sem modificação caso ocorra algum erro.
+> Por padrão, se o provedor de banco de dados oferecer suporte a transações, todas as alterações em uma única chamada para SaveChanges serão aplicadas em uma transação. Se qualquer uma das alterações falhar, a transação é revertida e nenhuma das alterações será aplicada ao banco de dados.
 
-Será tratado aqui o funcionamento do método `SaveChanges` analisando os logs do EF Core e as consultas geradas. O foco da análise será o controle da transação. A versão da biblioteca nos testes é a 5 e o banco de dados utilizado na análise é o SqlServer da Microsoft. Os resultados encontrados aqui podem ser diferentes em outras versões e/ou utilizando outro bancos de dados.
+Será tratado aqui o funcionamento do método `SaveChanges` analisando os logs do EF Core e as consultas geradas. O foco da análise será o controle da transação. A versão da biblioteca nos testes é a 5 e o banco de dados utilizado na análise é o SQL Server da Microsoft. Os resultados encontrados podem ser diferentes em outras versões e/ou utilizando outro bancos de dados.
 
 ## Configurando o `DbContext`
 
-Para obter as informações necessárias para o entendimento do EF Core o contexto do banco de dados deve ser configurado.
+O contexto do banco de dados deve ser configurado para obter as informações necessárias para o entendimento do EF Core.
 
 ```csharp
 protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -20,11 +20,11 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 }
 ```
 
-O método `LogTo` usado na configuração é a nova maneira de acessar os logs do EF Core. A funcionalidade [Simple Logging](https://docs.microsoft.com/en-us/ef/core/logging-events-diagnostics/simple-logging) foi apresentada na versão 5 do ORM. Esse método permite direcionar as entradas de log para o tipo de saída desejada. No exemplo, os dados são direcionados para janela de Debug do visual studio usando o método `Debug.Writeline`. Nas versões antigas é possível se obter os logs usando outros métodos. No EF Core 3.1 pode-se utilizar o `UseLoggerFactory`.
+O método `LogTo`, usado na configuração, é a nova maneira de acessar os logs do EF Core. A funcionalidade [Simple Logging](https://docs.microsoft.com/en-us/ef/core/logging-events-diagnostics/simple-logging) foi apresentada na versão 5 do ORM e permite direcionar as entradas de log para o tipo de saída desejada. No exemplo, os dados são direcionados para janela de Debug do Visual Studio usando o método `Debug.Writeline`. Nas versões antigas é possível se obter os logs usando o método `UseLoggerFactory`.
 
 ## Adicionando dados com o `SaveChanges`
 
-Para verificar o funcionamento do `SaveChanges` foi escrito um teste simples adicionando dois objetos no banco de dados. No banco de dados serão armazenadas duas linhas, uma em cada tabela.
+Para verificar o funcionamento do `SaveChanges` foi escrito um teste simples adicionando dois objetos no banco de dados. No banco serão armazenadas duas linhas, uma em cada tabela.
 
 ``` csharp
 var employee = new Employee
@@ -58,9 +58,9 @@ dbug: RelationalEventId.ConnectionOpening[20000] (Microsoft.EntityFrameworkCore.
 dbug: RelationalEventId.ConnectionOpened[20001] (Microsoft.EntityFrameworkCore.Database.Connection) 
       Opened connection to database 'Timesheet' on server 'localhost,1433'.
 ```
-As entradas de log seguintes são recionadas à transação. No primeiro momento, a transação é iniciada com o level de isolamento não especificado. A próxima mensagem mostra que a transação foi inializada com o level "ReadCommitted", que é o padrão do SQL Server.
+As entradas de log seguintes são relacionadas à transação. No primeiro momento, a transação é iniciada com o level de isolamento não especificado. A próxima mensagem mostra que a transação foi inicializada com o level [`ReadCommitted`](https://docs.microsoft.com/pt-br/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide?view=sql-server-ver15#database-engine-isolation-levels), que é o padrão do SQL Server.
 
-```sql
+``` sql
 dbug: RelationalEventId.TransactionStarting[20209] (Microsoft.EntityFrameworkCore.Database.Transaction) 
       Beginning transaction with isolation level 'Unspecified'.
 dbug: RelationalEventId.TransactionStarted[20200] (Microsoft.EntityFrameworkCore.Database.Transaction) 
@@ -133,7 +133,7 @@ dbug: RelationalEventId.TransactionStarting[20209] (Microsoft.EntityFrameworkCor
 dbug: RelationalEventId.TransactionStarted[20200] (Microsoft.EntityFrameworkCore.Database.Transaction) 
       Began transaction with isolation level 'ReadCommitted'.
 ```
-Ao executar o método `SaveChanges`, o EF Core cria um **ssavepoint** do banco de dados ao invés de abrir uma transação aninhada. Os logs de detecção de alterações nas entidades foram omitidos.
+Ao executar o método `SaveChanges`, o EF Core cria um **savepoint** do banco de dados ao invés de abrir uma transação aninhada. Os logs de detecção de alterações nas entidades foram omitidos.
 ```sql
 dbug: CoreEventId.SaveChangesStarting[10004] (Microsoft.EntityFrameworkCore.Update) 
       SaveChanges starting for 'TestContext'.
@@ -177,9 +177,9 @@ dbug: RelationalEventId.TransactionCommitted[20202] (Microsoft.EntityFrameworkCo
 
 ## Diferença entre transações aninhadas e savepoints no SQL Server
 
-No SQL Server, o `ROLLBACK` reverte todas as transações abertas da sessão. Não importa se existam transações aninhadas, o `ROLLBACK` vai desfazer todas as operações realizadas desde o primeiro `BEGIN TRANSACTION`.
+No SQL Server, o uso de transalçoes aninhadas tem um comportamento que costuma confundir os desenvolvedores. O `ROLLBACK` reverte todas as transações abertas da sessão. Não importa se existam transações aninhadas, o `ROLLBACK` vai desfazer todas as operações realizadas desde o primeiro `BEGIN TRANSACTION`.
 
-Já o `SAVE TRANSACTION` coloca uma tag no ponto desejado da transação de forma a ser possível reverter as mudanças até esse ponto. É possível criar vários savepoints em uma mesma transação. É importante lembrar que o `SAVE TRANSACTION` não abre uma transação.
+Já o `SAVE TRANSACTION` coloca uma tag no ponto desejado da transação de forma a ser possível executar o `ROLLBACK` e reverter as mudanças até esse ponto. É possível criar vários savepoints em uma mesma transação. É importante lembrar que o `SAVE TRANSACTION` não abre uma transação.
 
 ![diferença entre transações aninhadas e savepoints](./docs/nested-vs-save.png "Diferença entre transações aninhadas e savepoints")
 
@@ -203,7 +203,7 @@ transaction.Commit();
 
 ## Versões anteriores
 
-A funcionalidade de savepoints foi incluída no EF Core 5. Nas versões 3.1 e 2.1 o EF Core além de não permitir a criação de savepoints de forma manual também não executa um `SAVE TRANSACTION` durante a executação do método `SaveChanges`. No caso de não existir uma transação aberta no contexto o `SaveChanges` criará uma. Caso já exista, como no segundo teste, o `SaveChanges` apenas executa os comandos de alteração da base de dados.
+A funcionalidade de savepoints foi incluída no EF Core 5. Nas versões 3.1 e 2.1 o EF Core, além de não permitir a criação de savepoints de forma manual, também não executa um `SAVE TRANSACTION` durante a execução do método `SaveChanges`. No caso de não existir uma transação aberta no contexto o `SaveChanges` criará uma. Caso já exista, como no segundo teste, o `SaveChanges` apenas executa os comandos de alteração da base de dados.
 
 ## Conclusão
 
