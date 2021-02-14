@@ -178,7 +178,7 @@ dbug: RelationalEventId.TransactionCommitted[20202] (Microsoft.EntityFrameworkCo
 
 ## Diferença entre transações aninhadas e savepoints no SQL Server
 
-No SQL Server, o uso de trnansações aninhadas tem um comportamento que pode confundir os desenvolvedores. O `ROLLBACK` reverte todas as transações abertas da sessão. Não importa se existam transações aninhadas, o `ROLLBACK` vai desfazer todas as operações realizadas desde o primeiro `BEGIN TRANSACTION`.
+No SQL Server, o uso de transações aninhadas tem um comportamento que pode confundir os desenvolvedores. O `ROLLBACK` reverte todas as transações abertas da sessão. Não importa se existam transações aninhadas, o `ROLLBACK` vai desfazer todas as operações realizadas desde o primeiro `BEGIN TRANSACTION`.
 
 Já o `SAVE TRANSACTION` coloca uma tag no ponto desejado da transação de forma a ser possível executar o `ROLLBACK` e reverter as mudanças até esse ponto. É possível criar vários savepoints em uma mesma transação. É importante lembrar que o `SAVE TRANSACTION` não abre uma transação.
 
@@ -204,7 +204,7 @@ transaction.Commit();
 
 ## Versões anteriores
 
-A funcionalidade de savepoints foi incluída no EF Core 5. Nas versões 3.1 e 2.1 o EF Core, além de não permitir a criação de savepoints de forma manual, também não executa um `SAVE TRANSACTION` durante a execução do método `SaveChanges`. No caso de não existir uma transação aberta no contexto o `SaveChanges` criará uma. Caso já exista, como no segundo teste, o `SaveChanges` apenas executa os comandos de alteração da base de dados.
+A funcionalidade de savepoints foi incluída no EF Core 5. Nas versões 3.1 e 2.1 o EF Core, além de não permitir a criação de savepoints de forma manual, também não executa um `SAVE TRANSACTION` durante a execução do método `SaveChanges`. Ou seja, caso já exista uma transação aberta, como no segundo teste, o `SaveChanges` apenas executa os comandos de alteração da base de dados.
 
 ## Conclusão
 
